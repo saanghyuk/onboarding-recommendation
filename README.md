@@ -1,6 +1,68 @@
-# Onboarding Recommendation Service
+# Onboarding Recommendation Engine
 
-**Menswear cold-start onboarding recommendation** with online Thompson Sampling. A new user answers a 3-tap quiz (style / price / item), and the server returns a personalised product list drawn from a weekly-refreshed cohort pool. Every user event (click / purchase / skip / dwell) updates a Beta posterior in real time.
+A **cold-start recommendation engine** for e-commerce onboarding.
+Turn a 3-tap quiz — or a voice utterance, or a Tinder-style swipe — into a
+live-learning product feed in under 30 seconds of user time, and let the
+model keep learning from every click, purchase, and skip.
+
+Built for the moment you know least about a new user: their first session.
+
+---
+
+## Why this engine
+
+A new user's first session has no data. Most commerce apps patch this with
+a hand-curated "trending" list that converts poorly and never adapts. This
+engine attacks that gap directly.
+
+- **Start from a 3-tap onboarding** — user answers three axes
+  (`style · price · item`) and lands in one of ~60 cohort buckets built
+  from your existing buyer base.
+- **Learn from the first click** — no re-training loop. A single atomic
+  SQL update moves the Beta(α, β) posterior in real time. The next
+  request is already smarter.
+- **Warehouse-agnostic** — Snowflake, BigQuery, Postgres, or DuckDB. Swap
+  the SQL, keep everything else.
+- **UI-free by design** — this repo ships only the API and model. Bring
+  your own front-end (5 reference implementations included below).
+
+## Algorithm at a glance
+
+- **Thompson Sampling bandit** over `(cohort, product)` — Beta(α, β)
+  posteriors with a K-rescaled weakly-informative prior, so the first
+  click actually moves the ranking (naive implementations get drowned by
+  the seed weight and never learn).
+- **Weekly cohort builder** — Bayesian smoothing with recency half-life,
+  brand-diversity cap, and exploit / explore split.
+- **Bayesian active learning (swipe mode)** — posterior over 6 archetypes,
+  information-gain-based next-card selection, early stop at 4-5 swipes
+  once confidence crosses 0.75.
+- **Category and season hygiene** — configurable filters that keep, e.g.,
+  golf brands out of casual cohorts and winter coats out of summer feeds.
+  Point the vocab list at your own catalogue.
+- **NLU with rule-based fallback** — Claude Haiku when the API key is
+  available, otherwise a deterministic keyword parser that still returns
+  sensible triples.
+- **Enum-safe API** — garbage input gets clamped to sensible defaults
+  instead of raising 500.
+
+## Five onboarding UX modes, one API
+
+Chatbot, quiz, voice, swipe, persona — pick the one that fits your brand.
+All five reduce to the same `(style, price, item)` triple and hit the same
+`GET /api/recommendations` endpoint. To ship a new UX, produce those three
+axes any way you like and pass them in.
+
+| Mode | When to use |
+|---|---|
+| Chatbot | Conversational-tone apps, lifestyle brands, guided onboarding |
+| Quiz | Lowest drop-off. Default when retention is the priority |
+| Voice | Strong first impression, accessibility, LLM-forward apps |
+| Swipe | Gamified. Works best where taste is expressive (fashion, beauty) |
+| Persona | Identity-matching brands ("this is my kind of thing") |
+
+Reference implementations live in the demo front-end. See
+`docs/FRONTEND_INTEGRATION.md` for wiring notes.
 
 ---
 
