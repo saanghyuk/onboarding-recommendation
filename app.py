@@ -619,36 +619,43 @@ class NLURequest(BaseModel):
 
 
 def _nlu_rule_based(text: str) -> dict:
-    """Keyword-based fallback when the LLM is unavailable (must behave like the real thing).
-    NOTE: order matters - stronger signals (golf/outdoor) first, ambiguous ones (shirt) last."""
-    t = text.lower()
+    """Keyword-based fallback when the LLM is unavailable.
 
-    # style: 'shirt' overlaps with 't-shirt', so formal only triggers on suit/formal/business keywords
-    if re.search(r'golf|round|course|links|golf wear', t):
+    Ships with English + Korean vocabulary out of the box. Extend the
+    alternations below with your own domain terms (any language) — the parser
+    is a plain regex, so adding tokens is a one-line change.
+
+    NOTE: order matters - stronger signals (golf / outdoor) first, ambiguous
+    ones (shirt / 셔츠) last, because 'shirt' overlaps with 't-shirt'.
+    """
+    t = text.lower()  # Hangul is unaffected by lower() so this only normalises ASCII
+
+    # style
+    if re.search(r'golf|round|course|links|golf wear|골프|라운드|필드|골프복|골프장', t):
         style = 'golf'
-    elif re.search(r'hiking|outdoor|trekking|camping|hike|mountain|backpacking|climbing', t):
+    elif re.search(r'hiking|outdoor|trekking|camping|hike|mountain|backpacking|climbing|등산|아웃도어|트레킹|캠핑|하이킹|야외|산행|백패킹', t):
         style = 'outdoor'
-    elif re.search(r'suit|formal|business|office|dress shirt|blazer|tie|meeting', t):
+    elif re.search(r'suit|formal|business|office|dress shirt|blazer|tie|meeting|정장|수트|포멀|비즈니스|출근|오피스|사무실|격식|드레스셔츠|드레스 셔츠|와이셔츠', t):
         style = 'formal'
     else:
         style = 'sports_casual'
 
     # price
-    if re.search(r'budget|cheap|affordable|low[- ]?cost|under 30|inexpensive', t):
+    if re.search(r'budget|cheap|affordable|low[- ]?cost|under 30|inexpensive|가성비|저렴|싸게|3만원|이하|미만|저가|저렴한|싼|부담 없이', t):
         price = 'low'
-    elif re.search(r'premium|luxury|high[- ]?end|over 80|top quality|expensive|designer', t):
+    elif re.search(r'premium|luxury|high[- ]?end|over 80|top quality|expensive|designer|고급|프리미엄|8만|이상|비싸도|고가|명품|하이엔드|명품급', t):
         price = 'high'
     else:
         price = 'mid'
 
     # item: shoes first (a trekking shoe is still a shoe once outdoor style is decided)
-    if re.search(r'sneaker|shoe|shoes|loafer|boot|runner|golf shoe|trekking shoe|hiking shoe', t):
+    if re.search(r'sneaker|shoe|shoes|loafer|boot|runner|golf shoe|trekking shoe|hiking shoe|운동화|구두|신발|로퍼|부츠|스니커즈|골프화|런닝화|러닝화|워커|트레킹화|등산화|워킹화', t):
         item = 'shoes'
-    elif re.search(r'jacket|coat|padding|windbreaker|blazer|parka|outer|outerwear', t):
+    elif re.search(r'jacket|coat|padding|windbreaker|blazer|parka|outer|outerwear|자켓|재킷|코트|패딩|바람막이|점퍼|아우터|블레이저|파카|외투', t):
         item = 'outer'
-    elif re.search(r'pants|trouser|jeans|denim|slacks|shorts|chino|jogger|cargo|bottom', t):
+    elif re.search(r'pants|trouser|jeans|denim|slacks|shorts|chino|jogger|cargo|bottom|팬츠|바지|청바지|데님|슬랙스|반바지|숏팬츠|치노|조거|하의|쇼츠', t):
         item = 'bottom'
-    elif re.search(r't[- ]?shirt|short sleeve|long sleeve|knit|sweatshirt|polo|hoodie|sweater|blouse|inner|top|shirt', t):
+    elif re.search(r't[- ]?shirt|short sleeve|long sleeve|knit|sweatshirt|polo|hoodie|sweater|blouse|inner|top|shirt|티셔츠|반팔|긴팔|니트|맨투맨|폴로|후드|스웨터|블라우스|이너|카라티|카라 티|상의|폴로 셔츠|티|셔츠', t):
         item = 'top'
     else:
         item = 'browse'
