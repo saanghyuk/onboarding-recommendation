@@ -100,13 +100,14 @@ Interaction: `seed_from_lookup()` in `app.py` seeds *only new* (cohort × produc
 ## 3. Weekly pipeline
 
 ### 3.1 Human step (see [docs/WEEKLY_WORKFLOW.md](docs/WEEKLY_WORKFLOW.md))
-1. Open `notebooks/weekly_data_pull.ipynb`
-2. Run the warehouse SQL cells
-3. Save three files (schema in [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md)):
+1. Run your warehouse query (Snowflake, BigQuery, Postgres, DuckDB — anything). A starter SQL template is in `scripts/service_reco_weekly_build.py`.
+2. Export three files (schema in [docs/DATA_SCHEMA.md](docs/DATA_SCHEMA.md)):
    - `events_cohort_slim.csv` — app purchase events
    - `web_events.csv` — web purchase events
    - `user_master_coldstart.parquet` — user profile / app↔web mapping
-4. Upload to `data/incoming/` on the server. Done.
+3. Drop them in `data/incoming/` on the server. Done.
+
+If you don't have a warehouse yet, run `python scripts/generate_sample_data.py` for a synthetic fixture (60 cohorts × 30 products) so the service boots into a working demo.
 
 ### 3.2 Automatic server side
 ```
@@ -179,23 +180,24 @@ The 5× purchase-to-click ratio is a demo default — see [docs/PRODUCTION_ROADM
 
 ### 5.1 Layout
 ```
-service_app/
+onboarding-recommendation/
 ├── ARCHITECTURE.md                       # (this file)
+├── README.md
+├── LICENSE
 ├── app.py                                # FastAPI + Thompson sampling + NLU
 ├── requirements.txt
 ├── docs/                                 # per-topic specs
-├── notebooks/weekly_data_pull.ipynb      # warehouse extract template
-├── scripts/service_reco_weekly_build.py  # weekly batch
-├── static/                               # 5 quiz UI variants
-│   ├── index.html   simple.html   voice.html
-│   ├── swipe.html   persona.html
-│   └── (assets)
-│
-└── data/  logs/                          # runtime (gitignored)
-    ├── incoming/  raw/  processed/
-    ├── reco_lookup/reco_lookup_latest.json
-    ├── bandit.db                         # SQLite posterior + feedback log
-    └── logs/quiz_log_YYYY-MM-DD.jsonl
+└── scripts/
+    ├── generate_sample_data.py           # synthetic fixture (no warehouse)
+    └── service_reco_weekly_build.py      # weekly batch template
+
+# Runtime-generated (gitignored):
+data/
+├── incoming/  raw/  processed/
+├── reco_lookup/reco_lookup_latest.json
+└── bandit.db                             # SQLite posterior + feedback log
+logs/
+└── quiz_log_YYYY-MM-DD.jsonl
 ```
 
 ### 5.2 File lifecycle
@@ -207,19 +209,21 @@ service_app/
 | `logs/quiz_log_*.jsonl` | Proportional to users | Per quiz step | FastAPI (auto) |
 | Raw CSV/parquet | Hundreds of MB | Weekly | Jupyter (human upload) |
 
-### 5.3 Five UI variants (`static/`)
+### 5.3 Five UI variants (reference implementations)
 
-Each variant collects the same `(style, price, item)` triple with different UX:
+This repo ships the API only. If you drop your own `index.html` / `simple.html` / `voice.html` / `swipe.html` / `persona.html` into a `./static/` directory, the corresponding routes below will serve them. Otherwise `/` returns a JSON landing and the other paths return 404 with a helpful pointer.
 
-| Route | File | UX pattern |
-|---|---|---|
-| `/` | `index.html` | Default landing (mascot + chip quiz) |
-| `/simple` | `simple.html` | Chip-based 3-step quiz |
-| `/voice` | `voice.html` | Natural-language input → `/api/nlu` |
-| `/swipe` | `swipe.html` | Tinder-style swipe · lookup inlined server-side as `window.RECO_LOOKUP` |
-| `/persona` | `persona.html` | Persona picker |
+Each reference variant collects the same `(style, price, item)` triple with a different UX pattern:
 
-All five wire `click / skip / purchase` feedback to `/api/feedback`.
+| Route | UX pattern |
+|---|---|
+| `/` | Default landing (mascot + chip quiz) |
+| `/simple` | Chip-based 3-step quiz |
+| `/voice` | Natural-language input → `/api/nlu` |
+| `/swipe` | Tinder-style swipe with server-injected `window.RECO_LOOKUP` |
+| `/persona` | Persona picker |
+
+All five wire `click / skip / purchase` feedback to `/api/feedback`. Wiring notes for iOS, Android, and web are in [docs/FRONTEND_INTEGRATION.md](docs/FRONTEND_INTEGRATION.md).
 
 ---
 

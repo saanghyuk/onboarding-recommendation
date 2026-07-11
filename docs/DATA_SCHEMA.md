@@ -223,9 +223,9 @@ One JSON object per line, produced by `POST /api/quiz-log`:
 ## 5. Schema evolution
 
 When warehouse column names change:
-- Update the SQL in `notebooks/weekly_data_pull.ipynb`
+- Update the SQL in whatever query tool you use to produce the three exports (Jupyter, DBeaver, warehouse console, `duckdb` CLI, …)
 - Update the top-of-file constants in `scripts/service_reco_weekly_build.py`
-- Rerun the notebook and confirm the build script still writes a fresh lookup
+- Re-run the query and confirm the build script still writes a fresh lookup
 
 The minimum contract is EVENTS 4 columns · WEB 4 columns · MASTER 2 columns.
 
@@ -243,8 +243,8 @@ The [production roadmap](PRODUCTION_ROADMAP.md) covers evolving this to an embed
 
 ## Related Files
 
-- `notebooks/weekly_data_pull.ipynb`
 - `scripts/service_reco_weekly_build.py`
+- `scripts/generate_sample_data.py`
 - `app.py` — `BanditDB` class
 - [WEEKLY_WORKFLOW.md](WEEKLY_WORKFLOW.md)
 - [MODEL_SPEC.md](MODEL_SPEC.md)

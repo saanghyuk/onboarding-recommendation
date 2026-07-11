@@ -510,25 +510,63 @@ def quiz_stats():
     return {'total': len(records), 'by_step': by_step, 'unique_sessions': len(sessions)}
 
 
-@app.get("/", response_class=HTMLResponse)
+# ============ HTML routes (optional — demo UIs are not shipped in this repo) ============
+# If you drop your own front-end at ./static/{index,simple,voice,swipe,persona}.html
+# these routes will serve them. Otherwise `/` returns a small JSON landing and the
+# demo paths return 404 with a helpful message. The API endpoints above always work.
+
+def _api_landing():
+    return {
+        "service": "Onboarding Recommendation Engine",
+        "status": "ok",
+        "hint": "This repo ships the API only. Bring your own front-end.",
+        "docs": {
+            "api_spec": "See docs/API_SPEC.md",
+            "frontend": "See docs/FRONTEND_INTEGRATION.md",
+        },
+        "endpoints": [
+            "GET /api/health",
+            "GET /api/quiz-config",
+            "GET /api/recommendations?style=&price=&item=&k=60",
+            "POST /api/feedback",
+            "POST /api/nlu",
+            "GET /api/bandit-stats",
+        ],
+    }
+
+
+def _serve_static_html(filename: str):
+    path = STATIC / filename
+    if not path.exists():
+        raise HTTPException(404, f"{filename} not in ./static/. This repo ships API-only — mount your own front-end at ./static/ or call the API directly. See docs/FRONTEND_INTEGRATION.md.")
+    return HTMLResponse(path.read_text(encoding='utf-8'))
+
+
+@app.get("/")
 def index():
-    return (STATIC / "index.html").read_text(encoding='utf-8')
+    path = STATIC / "index.html"
+    if path.exists():
+        return HTMLResponse(path.read_text(encoding='utf-8'))
+    return JSONResponse(_api_landing())
 
 
 @app.get("/simple", response_class=HTMLResponse)
 def simple():
-    return (STATIC / "simple.html").read_text(encoding='utf-8')
+    return _serve_static_html("simple.html")
 
 
 @app.get("/voice", response_class=HTMLResponse)
 def voice():
-    return (STATIC / "voice.html").read_text(encoding='utf-8')
+    return _serve_static_html("voice.html")
 
 
 @app.get("/swipe", response_class=HTMLResponse)
 def swipe():
-    """swipe.html: inject window.RECO_LOOKUP server-side (matches the shape the static Vercel demo expects; rename this global if you rebrand the client)."""
-    html = (STATIC / "swipe.html").read_text(encoding='utf-8')
+    """swipe.html: inject window.RECO_LOOKUP server-side so the client can render the swipe deck without an extra fetch. Rename the global if you rebrand the client."""
+    path = STATIC / "swipe.html"
+    if not path.exists():
+        raise HTTPException(404, "swipe.html not in ./static/. See docs/FRONTEND_INTEGRATION.md.")
+    html = path.read_text(encoding='utf-8')
     try:
         lookup = cache.get()
         # Slim payload: keep only top items per cohort (swipe UI uses cohort x top-few)
@@ -539,12 +577,12 @@ def swipe():
                 continue
             slim['cohorts'][k] = {
                 'cohort_size': c.get('cohort_size', 0),
-                'top12': top12[:4],  # top4 - a bit of slack for diversity
+                'top12': top12[:4],
             }
         payload = json.dumps(slim, ensure_ascii=False)
         inject = f'<script>window.RECO_LOOKUP = {payload};</script>'
         html = html.replace('</head>', inject + '</head>', 1)
-    except Exception as e:
+    except Exception:
         # If lookup is missing, still render the page - client handles the error panel
         pass
     return html
@@ -552,7 +590,7 @@ def swipe():
 
 @app.get("/persona", response_class=HTMLResponse)
 def persona():
-    return (STATIC / "persona.html").read_text(encoding='utf-8')
+    return _serve_static_html("persona.html")
 
 
 # ============ NLU - Claude Haiku (used by the voice page) ============
@@ -668,7 +706,9 @@ def nlu(req: NLURequest):
     return {'ok': True, **rb, 'raw_text': text}
 
 
-app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
+# Mount static assets only if the directory exists (this repo ships API-only).
+if STATIC.exists() and STATIC.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
 # On startup: eager seed

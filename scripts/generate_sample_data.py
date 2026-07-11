@@ -58,7 +58,9 @@ def make_cohort(style, price, item):
     names = NAME_TEMPLATES[item]
     low, high = PRICE_RANGE[price]
     products = []
-    for i in range(10):
+    # 30 products per cohort so the default k=60 request stays informative even
+    # after the brand-diversity cap trims a few. Adopters can tune this.
+    for i in range(30):
         brand = brands[i % len(brands)]
         name = names[i % len(names)]
         pid = f"{style[:2]}{price[0]}{item[0]}-{i:03d}"

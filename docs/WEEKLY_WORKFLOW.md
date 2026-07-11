@@ -7,10 +7,14 @@
 ## 0. Summary
 
 **Human step (~10 min per week)**:
-1. Open `notebooks/weekly_data_pull.ipynb`
-2. Run the warehouse SQL cells
-3. Upload the three resulting files to `data/incoming/` on the server
+1. Run your warehouse query (starter SQL lives in `scripts/service_reco_weekly_build.py` and inside the cells shown below).
+2. Export the three resulting files.
+3. Upload them to `data/incoming/` on the server.
 4. Done.
+
+> No warehouse yet? `python scripts/generate_sample_data.py` gives you a
+> synthetic lookup so the service boots and you can wire clients before the
+> data pipeline is ready.
 
 **Automatic step (no human involvement)**:
 - Cron / file-watcher detects the fresh, complete set
@@ -27,12 +31,11 @@
 - Have credentials for your warehouse (Snowflake, BigQuery, Postgres, …)
 - Install the appropriate connector (e.g. `snowflake-connector-python`)
 
-### 1.2 Notebook environment
-```bash
-cd service_app
-jupyter lab
-# open notebooks/weekly_data_pull.ipynb
-```
+### 1.2 Query environment
+
+Any tool that can run SQL and export CSV / parquet works — Jupyter,
+DBeaver, a warehouse console, `duckdb` CLI, or a plain Python script.
+The cells in §2.1 show one Python-based flow; adapt to your team's habit.
 
 ### 1.3 Authentication
 Configure whichever auth mode your warehouse supports:
@@ -147,12 +150,16 @@ Alternative upload paths: `rsync`, S3 client, SFTP client, or `flyctl ssh sftp`.
 
 ### 3.1 Cron watcher (recommended, simple)
 
+Drop the sample `check_and_build.sh` below onto the server (a good spot is
+`/opt/reco/check_and_build.sh` or your project's `scripts/`), `chmod +x`,
+then register a cron entry:
+
 `/etc/cron.d/reco-check`:
 ```
-*/5 * * * * ubuntu /app/service_app/scripts/check_and_build.sh >> /var/log/reco_watcher.log 2>&1
+*/5 * * * * ubuntu /opt/reco/check_and_build.sh >> /var/log/reco_watcher.log 2>&1
 ```
 
-Sample `check_and_build.sh`:
+Sample `check_and_build.sh` (copy verbatim, tune paths):
 ```bash
 #!/bin/bash
 INCOMING=/data/incoming
@@ -259,8 +266,8 @@ Bad inputs are moved to `/data/incoming/failed/`. The previous `reco_lookup_late
 
 ## Related Files
 
-- `notebooks/weekly_data_pull.ipynb`
 - `scripts/service_reco_weekly_build.py`
+- `scripts/generate_sample_data.py`
 - [DATA_SCHEMA.md](DATA_SCHEMA.md)
 - [MODEL_SPEC.md](MODEL_SPEC.md)
 - [DEPLOY.md](DEPLOY.md)

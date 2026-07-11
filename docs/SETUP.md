@@ -36,19 +36,32 @@ pip install -r requirements.txt
 mkdir -p data/incoming data/raw data/processed data/reco_lookup logs
 ```
 
-### 1.4 Data preparation
+### 1.4 Data preparation — pick one path
 
-You need three files in `data/raw/` matching [DATA_SCHEMA.md](DATA_SCHEMA.md):
+**Path A · Synthetic fixture (default, no warehouse)**
+
+```bash
+python scripts/generate_sample_data.py
+# Writes data/reco_lookup/reco_lookup_latest.json with 60 cohorts × 30 products.
+# Uses generic brand names (`FairwayCo`, `EverydayCo`, …) so it's portable.
+```
+
+You can skip §1.5 with this path — the fixture is already the lookup JSON the
+service reads.
+
+**Path B · Real warehouse (production wire-up)**
+
+Produce three files in `data/raw/` matching [DATA_SCHEMA.md](DATA_SCHEMA.md):
 
 - `events_cohort_slim.csv`
 - `web_events.csv`
 - `user_master_coldstart.parquet`
 
-Two options:
-- **With a warehouse**: open `notebooks/weekly_data_pull.ipynb`, plug in your credentials, run the SQL cells, save the outputs to `data/raw/`.
-- **Without a warehouse (synthetic)**: hand-craft a few dozen rows following the schema, or write a small Python script that fabricates them. Even 200 mock purchases across ~20 products will let the build succeed and the API return real responses.
+Then run the weekly batch below. The starter SQL is in
+`scripts/service_reco_weekly_build.py` and covers Snowflake, BigQuery,
+Postgres, and DuckDB. Adopt the parts you need.
 
-### 1.5 Build the first lookup
+### 1.5 Build the first lookup (Path B only)
 ```bash
 python scripts/service_reco_weekly_build.py
 # Takes ~5 minutes on real data, seconds on synthetic
@@ -105,16 +118,17 @@ curl -X POST http://localhost:8000/api/feedback \
   -d '{"cohort_key":"golf__mid__browse","product_id":"P0001","signal":"click","session_id":"test-1"}'
 ```
 
-### 1.10 Try the five UI variants
+### 1.10 (Optional) Try the five reference UI variants
 
-Open in a browser:
-- `http://localhost:8000/` — landing (mascot + chips)
+This repo ships the API only. If you have your own `index.html` / `simple.html` / `voice.html` / `swipe.html` / `persona.html`, drop them into `./static/` and the routes below will serve them. Otherwise `/` returns a JSON landing and the other paths return 404.
+
+- `http://localhost:8000/` — landing
 - `http://localhost:8000/simple` — chip-only three-step quiz
-- `http://localhost:8000/voice` — natural-language input (falls back to rule-based NLU if `ANTHROPIC_API_KEY` is unset)
+- `http://localhost:8000/voice` — natural-language input (uses `/api/nlu`; rule-based fallback when `ANTHROPIC_API_KEY` is unset)
 - `http://localhost:8000/swipe` — Tinder-style swipe (lookup injected as `window.RECO_LOOKUP`)
 - `http://localhost:8000/persona` — persona picker
 
-Each variant collects `(style, price, item)` differently and wires `click / skip / purchase` feedback.
+Wiring notes for iOS, Android, and web (including `click / skip / purchase` feedback) are in [FRONTEND_INTEGRATION.md](FRONTEND_INTEGRATION.md).
 
 ---
 
@@ -175,8 +189,8 @@ rm data/bandit.db
 ## Related Files
 
 - `app.py`
+- `scripts/generate_sample_data.py`
 - `scripts/service_reco_weekly_build.py`
-- `notebooks/weekly_data_pull.ipynb`
 - [DEPLOY.md](DEPLOY.md)
 - [WEEKLY_WORKFLOW.md](WEEKLY_WORKFLOW.md)
 - [FRONTEND_INTEGRATION.md](FRONTEND_INTEGRATION.md)

@@ -96,24 +96,17 @@ A single line: **turn a 3-tap quiz into a live-learning recommendation engine th
 ## Repository layout
 
 ```
-service_app/
+onboarding-recommendation/
 ├── README.md                                  <- this file
 ├── ARCHITECTURE.md                            <- system diagram + components
+├── LICENSE
 ├── requirements.txt
 ├── .gitignore
 │
 ├── app.py                                     <- FastAPI + Thompson sampling bandit
 ├── scripts/
-│   └── service_reco_weekly_build.py           <- Weekly batch (pool rebuild)
-├── static/                                    <- 5 demo UIs
-│   ├── index.html      (default landing)
-│   ├── simple.html     (chip-based quiz)
-│   ├── voice.html      (natural-language / NLU)
-│   ├── swipe.html      (Tinder-style)
-│   └── persona.html    (persona picker)
-│
-├── notebooks/
-│   └── weekly_data_pull.ipynb                 <- warehouse pull template
+│   ├── generate_sample_data.py                <- synthetic fixture (no warehouse needed)
+│   └── service_reco_weekly_build.py           <- weekly batch (bring your own SQL)
 │
 ├── docs/
 │   ├── SETUP.md
@@ -126,53 +119,68 @@ service_app/
 │   └── PRODUCTION_ROADMAP.md
 │
 └── data/  logs/                               <- runtime-generated (gitignored)
-    ├── raw/                                   <- Jupyter upload target
-    ├── incoming/                              <- pending new files
-    ├── processed/
-    ├── reco_lookup/                           <- weekly build output
+    ├── reco_lookup/                           <- lookup JSON (fixture or batch output)
     ├── bandit.db                              <- SQLite posterior store
     └── quiz_logs.jsonl
 ```
 
+This repo ships **only the API and model**. The demo UIs (chatbot / quiz / voice / swipe / persona) are reference implementations — you bring your own front-end. See `docs/FRONTEND_INTEGRATION.md` for wiring notes.
+
 ---
 
-## Quick Start (5 minutes)
+## Quick Start (30 seconds)
 
 ```bash
-# 1. Clone + Python env
-git clone <this-repo-url> onboarding-recommendation
+git clone https://github.com/saanghyuk/onboarding-recommendation
 cd onboarding-recommendation
-python3.13 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 2. Prepare data folders
-mkdir -p data/raw data/processed data/reco_lookup data/incoming logs
+# Synthetic fixture — 60 cohorts, 600 products. Runs standalone, no warehouse.
+python scripts/generate_sample_data.py
 
-# 3. Drop three warehouse extracts into data/raw/ (see docs/DATA_SCHEMA.md)
-#    - events_cohort_slim.csv
-#    - web_events.csv
-#    - user_master_coldstart.parquet
-
-# 4. Build the first lookup (~5 min)
-python scripts/service_reco_weekly_build.py
-
-# 5. Start the API server
 uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-
-# 6. Health check
-curl http://localhost:8000/api/health
-
-# 7. First recommendation
-curl "http://localhost:8000/api/recommendations?style=golf&price=mid&item=browse&session_id=test-1&k=60"
-
-# 8. Send a feedback signal
-curl -X POST http://localhost:8000/api/feedback \
-  -H "Content-Type: application/json" \
-  -d '{"cohort_key":"golf__mid__browse","product_id":"P0001","signal":"click","session_id":"test-1"}'
 ```
 
-Open `http://localhost:8000/` for the default UI, or try `/simple`, `/voice`, `/swipe`, `/persona` for the other four quiz variants.
+Then hit the API:
+
+```bash
+curl "http://localhost:8000/api/recommendations?style=golf&price=high&item=top&k=12"
+```
+
+Send some feedback and watch the posterior move:
+
+```bash
+curl -X POST http://localhost:8000/api/feedback \
+  -H "Content-Type: application/json" \
+  -d '{"session_id":"u1","cohort_key":"golf__high__top",
+       "product_id":"go2t-000","signal":"purchase"}'
+```
+
+A `purchase` bumps α by 5.0. Re-run the recommendations call and you'll see that product hold rank 1 in nearly every draw within a few events — that's real online learning, not a nightly batch.
+
+Ready to plug in your real catalogue? Jump to [Bring your own warehouse](#bring-your-own-warehouse) below.
+
+---
+
+## Adapt to your vertical
+
+The default vocabulary in this repo is a menswear-shopping example:
+`style ∈ {golf, sports_casual, formal, outdoor}`, `price ∈ {low, mid, high}`,
+`item ∈ {top, bottom, shoes, outer, browse}`, currency `KRW`,
+category tokens like `GOLF_TOKENS` / `WINTER_TOKENS` / `SUMMER_TOKENS`.
+
+**All of these are swappable.** Point the enums, price buckets, category
+vocab, and NLU keyword lists at your own domain:
+
+| Your vertical | Suggested axes |
+|---|---|
+| Beauty | `skin_type`, `price`, `product_type` (cleanser / toner / serum / …) |
+| Home goods | `room`, `price`, `category` (lighting / storage / decor / …) |
+| Grocery | `diet`, `price`, `department` (produce / bakery / dairy / …) |
+| Sportswear | `sport`, `price`, `item` |
+
+Concrete steps in `docs/MODEL_SPEC.md` §2 and `docs/DATA_SCHEMA.md` §1.
 
 ---
 
@@ -217,12 +225,12 @@ Contract: [docs/API_SPEC.md](docs/API_SPEC.md).
 ## Related Files
 
 - `app.py` — FastAPI service, bandit, NLU
-- `scripts/service_reco_weekly_build.py` — weekly batch
-- `notebooks/weekly_data_pull.ipynb` — Jupyter warehouse pull template
+- `scripts/generate_sample_data.py` — synthetic fixture generator (default entry point)
+- `scripts/service_reco_weekly_build.py` — weekly batch template (bring your own SQL)
 - `docs/PRODUCTION_ROADMAP.md` — everything a backend team needs to take this demo to production
 
 ---
 
 ## License
 
-Released for public reference. Use at your own risk; no warranty. See individual docs for operational caveats.
+MIT. See [LICENSE](LICENSE).
