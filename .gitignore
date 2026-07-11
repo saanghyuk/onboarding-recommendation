@@ -1,0 +1,79 @@
+# =============================================
+# Onboarding Recommendation Service - .gitignore
+# =============================================
+
+# ============ Data (never commit) ============
+data/
+!data/.gitkeep
+data/reco_lookup/*.json
+data/reco_lookup/*.tmp
+*.csv
+*.parquet
+*.pkl
+*.h5
+
+# ============ Secrets ============
+.env
+.env.local
+.env.production
+*.pem
+*.key
+credentials.json
+secrets/
+*.p12
+~/.snowflake/
+*.snowflake_credentials
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+build/
+dist/
+*.so
+.venv/
+venv/
+env/
+ENV/
+
+# ============ Jupyter ============
+.ipynb_checkpoints/
+notebooks/*.html
+notebooks/
+
+# ============ Logs ============
+logs/
+*.log
+
+# ============ SQLite (bandit posteriors) ============
+*.db
+*.db-journal
+*.sqlite3
+*.sqlite
+
+# ============ IDE ============
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ============ Deploy ============
+.vercel/
+.fly/
+*.pid
+
+# ============ Test coverage ============
+.coverage
+.pytest_cache/
+htmlcov/
+
+# ============ QA output (local screenshots, agent reports) ============
+qa/
+
+# ============ Front-end demo UI (served separately on Vercel) ============
+# The public demo UI is deployed elsewhere. This repo ships only the API +
+# model. See docs/FRONTEND_INTEGRATION.md for how to hit the API from your
+# own client.
+static/

@@ -1,0 +1,28 @@
+# Onboarding Recommendation Service - Python dependencies
+# Python 3.11 - 3.13 (Python 3.14 has pyexpat compatibility issues)
+
+# --- FastAPI server ---
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+python-multipart==0.0.12
+
+# --- Data processing (weekly build) ---
+duckdb==1.4.4
+pandas==2.2.3
+numpy==2.1.3
+pyarrow==18.0.0
+
+# --- Snowflake (notebooks/weekly_data_pull.ipynb) ---
+snowflake-connector-python==3.12.3
+snowflake-sqlalchemy==1.6.1
+
+# --- LLM (optional, NLU endpoint used by voice.html) ---
+anthropic==0.39.0
+
+# --- Development convenience ---
+jupyter==1.1.1
+jupyterlab==4.3.0
+
+# --- Production monitoring (optional) ---
+# sentry-sdk[fastapi]==2.18.0
