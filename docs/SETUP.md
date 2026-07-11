@@ -51,6 +51,21 @@ service reads.
 
 **Path B · Real warehouse (production wire-up)**
 
+**Initial bootstrap vs steady state** — this matters:
+
+| Phase | `--window-weeks` | Why |
+|---|---|---|
+| First launch (bootstrap) | **26 – 52 weeks** | Cohorts need enough first-time buyers per bucket. 4 weeks of history typically leaves thin cohorts (`outdoor__high__outer`, etc.) with < 10 buyers, and the prior is noisy. Pull 6–12 months once to warm the pool. |
+| Steady state (weekly refresh) | **4 weeks** (default) | After launch, you want recency (season shifts, new products, current pricing). The realtime bandit handles longer-term learning. |
+
+Concretely: on your first production run,
+
+```bash
+python scripts/service_reco_weekly_build.py --window-weeks=52
+```
+
+Then set the weekly cron to plain `service_reco_weekly_build.py` (defaults to 4 weeks). The `POST /api/rebuild` admin endpoint already calls the 52-week form for the same reason (`app.py:490`).
+
 Produce three files in `data/raw/` matching [DATA_SCHEMA.md](DATA_SCHEMA.md):
 
 - `events_cohort_slim.csv`

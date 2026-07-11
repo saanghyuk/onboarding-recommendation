@@ -25,6 +25,19 @@
 
 ---
 
+## 0.5 Initial bootstrap vs weekly refresh
+
+The build script is the same, but the `--window-weeks` flag should differ between the first production run and the weekly cadence.
+
+| Phase | Command | Rationale |
+|---|---|---|
+| **First launch (bootstrap, once)** | `python scripts/service_reco_weekly_build.py --window-weeks=52` | Cohorts need enough first-time buyers per bucket. Pull 6–12 months of history so thin cohorts (`outdoor__high__outer`, etc.) are not undersampled. |
+| **Weekly refresh (steady state)** | `python scripts/service_reco_weekly_build.py` (defaults to 4) | You now want recency — season shifts, new arrivals, current prices. The realtime bandit continues learning across weeks. |
+
+The `POST /api/rebuild` admin endpoint calls the 52-week form for exactly this reason (`app.py:490`); use it whenever a full re-pool is needed (major catalogue refresh, new brands, category taxonomy change).
+
+---
+
 ## 1. One-time prerequisites
 
 ### 1.1 Warehouse access
