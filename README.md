@@ -39,7 +39,10 @@ engine attacks that gap directly.
   once confidence crosses 0.75.
 - **Category and season hygiene** — configurable filters that keep, e.g.,
   golf brands out of casual cohorts and winter coats out of summer feeds.
-  Point the vocab list at your own catalogue.
+  Default is a regex tagger you can extend with any-language keywords; the
+  recommended production path is a one-line JOIN against your product
+  catalog's category column (see
+  [DATA_SCHEMA.md § 6](docs/DATA_SCHEMA.md#6-category-assignment-strategies)).
 - **NLU with rule-based fallback** — Claude Haiku when the API key is
   available, otherwise a deterministic keyword parser that still returns
   sensible triples.

@@ -16,7 +16,7 @@ Read this after skimming [ARCHITECTURE.md](../ARCHITECTURE.md) and [MODEL_SPEC.m
 - **Warehouse connection**: replace the notebook workflow with a scheduled job that pulls from Snowflake / BigQuery / Redshift directly. Use secret management (AWS Secrets Manager, Doppler, 1Password) — never bake keys into the image.
 - **Weekly cron**: pick one of GitHub Actions, Cloud Scheduler, or an in-cluster CronJob. Trigger `/api/rebuild` or invoke `scripts/service_reco_weekly_build.py` server-side.
 - **Product catalogue sync**: pull stock, price, image URL, category, season, brand each day from the merchandising system. Products missing from this catalogue must be filterable at serve time (out-of-stock guard).
-- **Category tagger evolution**: replace the regex `CATEGORY_RULES` (`scripts/service_reco_weekly_build.py`) and the `WINTER_TOKENS` / `GOLF_TOKENS` sets in `app.py:182` with an embedding-based classifier. A frozen sentence-transformer + a small linear head is a strong first version.
+- **Category tagger**: replace the default regex `CATEGORY_RULES` (`scripts/service_reco_weekly_build.py`) with a JOIN against your catalog's category column — this is the **recommended path** and eliminates the mixed-keyword misclassifications the regex baseline suffers from (e.g. "블루종 티셔츠" landing in both `outer` and `top`). If no catalog category exists, use an embedding classifier as a fallback. Full code sketch and comparison table in [DATA_SCHEMA.md § 6](DATA_SCHEMA.md#6-category-assignment-strategies). Do the same swap for the runtime hygiene filters (`WINTER_TOKENS` / `GOLF_TOKENS` in `app.py:180`).
 
 **Where to touch**: `scripts/service_reco_weekly_build.py`, `app.py:182` (token filters), infra layer (secret store, scheduler).
 

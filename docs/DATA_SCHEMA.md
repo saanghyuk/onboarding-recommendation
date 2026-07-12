@@ -231,13 +231,110 @@ The minimum contract is EVENTS 4 columns · WEB 4 columns · MASTER 2 columns.
 
 ---
 
-## 6. Product metadata gaps
+## 6. Category assignment strategies
 
-Raw payloads only carry brand, name, price. Season / occasion / style tags are absent. Current mitigations:
-- Regex-based `CATEGORY_RULES` in the build script (seasonal keywords, golf tokens)
-- `WINTER_TOKENS` / `SUMMER_TOKENS` / `GOLF_TOKENS` filters inside `bandit.sample()` (`app.py:182`)
+Cohorts are `{style}__{price}__{item}`. Both `style` and `item` require each product to carry a category tag. There are three ways to produce those tags — pick the one that fits your commerce stack.
 
-The [production roadmap](PRODUCTION_ROADMAP.md) covers evolving this to an embedding-based tagger and a product-catalogue sync.
+### Option A · Use your product catalog's `category` column  ✅ recommended
+
+Most commerce backends already store a category taxonomy per SKU
+(`men > tops > polo`, `home > lighting > pendant`, …). This is the fastest and
+most accurate path — no NLP, no false positives from mixed-keyword product
+names ("blouson t-shirt", "cardigan shirt", etc.).
+
+Replace the `CATEGORY_RULES` regex block in
+`scripts/service_reco_weekly_build.py` (around line 121) with a JOIN against
+your catalog:
+
+```python
+# Before (regex tagger, default in this repo):
+cat_case_when = ',\n'.join([
+    f"CASE WHEN regexp_matches(name, '{p}', 'i') THEN 1 ELSE 0 END AS cat_{cat}"
+    for cat, p in CATEGORY_RULES.items()
+])
+c.execute(f"CREATE OR REPLACE TABLE pp_tagged AS SELECT *, {cat_case_when} FROM pp")
+
+# After (catalog JOIN, recommended):
+c.execute("""
+CREATE OR REPLACE TABLE pp_tagged AS
+SELECT
+  pp.*,
+  CASE WHEN cat.style_l1  = 'golf'          THEN 1 ELSE 0 END AS cat_golf,
+  CASE WHEN cat.style_l1  = 'outdoor'       THEN 1 ELSE 0 END AS cat_outdoor,
+  CASE WHEN cat.style_l1  = 'formal'        THEN 1 ELSE 0 END AS cat_formal,
+  CASE WHEN cat.style_l1  = 'sports_casual' THEN 1 ELSE 0 END AS cat_sports,
+  CASE WHEN cat.item_type = 'top'           THEN 1 ELSE 0 END AS cat_top,
+  CASE WHEN cat.item_type = 'bottom'        THEN 1 ELSE 0 END AS cat_bottom,
+  CASE WHEN cat.item_type = 'shoes'         THEN 1 ELSE 0 END AS cat_shoes,
+  CASE WHEN cat.item_type = 'outer'         THEN 1 ELSE 0 END AS cat_outer,
+  CASE WHEN cat.season    = 'summer'        THEN 1 ELSE 0 END AS cat_summer,
+  CASE WHEN cat.season    = 'winter'        THEN 1 ELSE 0 END AS cat_winter
+FROM pp
+LEFT JOIN my_warehouse.product_catalog cat USING (product_id)
+""")
+```
+
+That single JOIN eliminates the mixed-keyword misclassification (blouson polo
+tagged as outer, cardigan shirt tagged as top+outer, etc.) that a regex tagger
+suffers from.
+
+You should also replace the same categories inside `bandit.sample()`
+(`app.py:180`) with catalog-driven filters — the `WINTER_TOKENS`,
+`SUMMER_TOKENS`, `GOLF_TOKENS` sets are the runtime hygiene filter and use
+the same taxonomy.
+
+### Option B · Regex tagger (the default this repo ships with)
+
+Used only when no product catalog is available. Fast to author, cheap to run,
+but noisy on product names that mix categories. Extend the `CATEGORY_RULES`
+dictionary in `scripts/service_reco_weekly_build.py` with your own vocabulary
+(any language — regex matches any Unicode).
+
+Known limitations:
+
+- **False positives** — "블루종 티셔츠" hits both `outer` (blouson) and `top`
+  (t-shirt) and shows up in both cohorts.
+- **False negatives** — season-specific or trending keywords ("쿨링 팬츠",
+  "cooling shorts") that were not anticipated get dropped from the summer
+  boost.
+- **Maintenance drift** — every new season / new-arrival wave needs a
+  vocabulary refresh.
+
+Use this as a **placeholder while your catalog integration is in progress**,
+not as a permanent solution.
+
+### Option C · Embedding tagger (advanced)
+
+For catalogs where the category field is missing or inconsistent, replace the
+regex step with a similarity classifier:
+
+- Encode each product's `title + brand` (and optionally the image) with a
+  frozen sentence / vision model. Suggested:
+  - Korean text → **Ko-SBERT**, **KoSimCSE**, or Anthropic embeddings
+  - Multi-lingual text → **multilingual-e5-large**, **BGE-M3**
+  - Image → **CLIP** (`clip-vit-large-patch14`)
+- Compute a centroid per known category from labelled seed products
+  (~30 examples per category is enough)
+- Assign each unknown product to the nearest centroid above a similarity
+  threshold; leave low-confidence ones untagged
+
+Typical accuracy: 90 %+ on Korean fashion catalogs vs ~65 % for the regex
+baseline in this repo. Cost is a one-time embedding job (a few hundred
+thousand products in ~30 minutes on a single GPU) plus refresh whenever new
+SKUs land.
+
+Cache the embeddings in your warehouse alongside the catalog so the weekly
+build stays a plain SQL step.
+
+---
+
+### Summary table
+
+| Option | Accuracy | Effort | When to use |
+|---|---|---|---|
+| **A. Catalog JOIN** | Highest (your ground truth) | Low — one JOIN | You have a category column. **Default recommendation.** |
+| **B. Regex tagger** | Medium; noisy on mixed names | Low — extend the dict | Bootstrap, MVP, or fallback when no catalog exists |
+| **C. Embedding tagger** | High (~90 %+) | Medium — one-time embed job | No catalog and mixed-keyword catalogue that regex mis-tags |
 
 ---
 

@@ -117,7 +117,12 @@ src_split = c.execute("SELECT src, COUNT(*) FROM pp GROUP BY src").fetchall()
 for s, n in src_split:
     print(f"    - {s}: {n:,}")
 
-# Category tagging (English keyword regexes; extend as needed for your catalog)
+# Category tagging.
+#
+# This regex tagger is the DEFAULT so the repo runs standalone with no
+# catalog dependency. In production, prefer joining your product catalog's
+# `category` column — see docs/DATA_SCHEMA.md § 6 (Category assignment
+# strategies) for the recommended path and a code sketch for the JOIN.
 CATEGORY_RULES = {
     'golf':    r'golf|Golf|GOLF|driver|iron|putter|caddie',
     'outdoor': r'outdoor|Outdoor|hiking|trekking|windbreaker|Windbreaker|trail|climbing',
